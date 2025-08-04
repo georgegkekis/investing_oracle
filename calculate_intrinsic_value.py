@@ -1,0 +1,121 @@
+import pandas as pd
+import yfinance as yf
+from datetime import datetime, timedelta
+
+def filter_undervalued_companies(output_filename="undervalued_companies.csv"):
+    """
+    Filters companies where the current stock price is less than or equal to 115% of the Margin of Safety (MOS) price.
+    """
+    df = pd.read_csv('nasdaq_intrinsic_values.csv')
+
+    # Check if required columns exist
+    required_columns = [
+        "Company", "Ticker", "EPS_initial", "EPS_latest",
+        "Current_price", "EPS_CAGR", "Future_EPS", 
+        "Future_Price", "Sticker_Price", "MOS_Price"
+    ]
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column: {col}")
+
+    # Filter companies where current price <= 115% of MOS price
+    undervalued = df[df["Current_price"] <= 1.15 * df["MOS_Price"]]
+
+    undervalued.to_csv(output_filename, index=False)
+    print(f"{len(undervalued)} undervalued companies saved to {output_filename}")
+
+def get_stock_price(ticker, date_str=None):
+    """
+    Get the stock closing price for a given ticker on a specified date.
+    If the date is a weekend, fallback to the previous Friday.
+
+    Parameters:
+        ticker (str): The stock ticker symbol.
+        date_str (str): The target date in 'YYYY-MM-DD' format. Defaults to today.
+
+    Returns:
+        float or None: Closing price on the valid trading day, or None if not found.
+    """
+    if date_str is None:
+        date = datetime.today().date()
+    else:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+    # Adjust if the date is a weekend
+    if date.weekday() == 5:      # Saturday
+        date -= timedelta(days=1)
+    elif date.weekday() == 6:    # Sunday
+        date -= timedelta(days=2)
+
+    start = date - timedelta(days=2)
+    end = date + timedelta(days=1)
+
+    data = yf.download(ticker, start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'), progress=False, auto_adjust=True)
+
+    if not data.empty:
+        # Try to find the closest available date on or before the target date
+        data = data.sort_index()
+        available_dates = data.index.strftime('%Y-%m-%d')
+        if date.strftime('%Y-%m-%d') in available_dates:
+            close_price = data.loc[data.index == pd.to_datetime(date), 'Close'].iloc[0]
+        else:
+            close_price = data['Close'].iloc[-1]  # fallback to the most recent available
+
+        print(f"{ticker} closing price on {date}: ${float(close_price.iloc[0]):.2f}")
+        return float(close_price.iloc[0])
+    else:
+        print(f"No data found for {ticker} near {date}")
+        return None
+
+def safe_float(value):
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip())
+    except:
+        return None
+
+def calculate_intrinsic_value(eps_old, eps_new, years=10, pe_ratio=30, discount_rate=0.15):
+    try:
+        eps_old = safe_float(eps_old)
+        eps_new = safe_float(eps_new)
+
+        if eps_old <= 0 or eps_new <= 0:
+            return None  # Invalid for CAGR
+
+        cagr = (eps_new / eps_old) ** (1 / years) - 1
+        future_eps = eps_new * (1 + cagr) ** years
+        future_price = future_eps * pe_ratio
+        sticker_price = future_price / ((1 + discount_rate) ** years)
+        mos_price = sticker_price * 0.5
+
+        return {
+            "EPS_CAGR": round(cagr * 100, 2),
+            "Future_EPS": round(future_eps, 2),
+            "Future_Price": round(future_price, 2),
+            "Sticker_Price": round(sticker_price, 2),
+            "MOS_Price": round(mos_price, 2),
+        }
+    except Exception as e:
+        print(f"Exception:{e}")
+        return None
+
+df = pd.read_csv("nasdaq_eps_data.csv")
+
+results = []
+
+for _, row in df.iterrows():
+    result = calculate_intrinsic_value(row["EPS_initial"], row["EPS_latest"])
+    if result:
+        result.update({
+            "Company": row["Company"],
+            "Ticker": row["Ticker"],
+            "EPS_initial": row["EPS_initial"],
+            "EPS_latest": row["EPS_latest"],
+            "Current_price": round(get_stock_price(row["Ticker"]), 2)
+        })
+        results.append(result)
+
+output_df = pd.DataFrame(results)
+output_df.to_csv("nasdaq_intrinsic_values.csv", index=False)
+
+print(f"Saved intrinsic value results for {len(output_df)} companies to 'nasdaq_intrinsic_values.csv'")
+filter_undervalued_companies()
