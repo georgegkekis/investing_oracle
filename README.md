@@ -23,17 +23,19 @@ A Python-based stock analysis tool that calculates intrinsic value estimates for
 
 ## Requirements
 
-pip install the following:
+`pip install pandas requests beautifulsoup4 yfinance tabulate`
 
-pandas
+## Usage
+`python3 get_nasdaq_companies_and_eps.py`
+Wait until this finishes. It will take about 50 minutes. Then run the next script:
 
-requests
+`python3 calculate_intrinsic_value.py`
 
-beautifulsoup4
+Then, the file that is interesting is:
 
-yfinance
+`undervalued_companies.csv_sorted`
 
-tabulate
+It contains a list of companies that are undervalued according to the oracle.
 
 ## Methodology
 The approach is based on Phil Town’s "Rule #1" investing strategy, which focuses on buying great companies at attractive prices based on conservative growth estimates.
@@ -43,9 +45,9 @@ Be a bit patient when using get_nasdaq_companies_and_eps.py as it will take
 50 minutes to complete. The reason is that there is a nasty 15 wait there
 between the calls to get the EPS because without it, the site blocks access.
 
-Disclaimer
+## Disclaimer
 This tool is for educational and informational purposes only and should not be considered financial advice. Always do your own research and consult a financial advisor before making investment decisions.
 
-Contact
+## Contact
 Created by George Gkekis.
 Feel free to contribute, fork, or open an issue!
