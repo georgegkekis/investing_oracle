@@ -2,11 +2,10 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 
-def filter_undervalued_companies(output_filename="undervalued_companies.csv"):
+def filter_undervalued_companies(df):
     """
     Filters companies where the current stock price is less than or equal to 115% of the Margin of Safety (MOS) price.
     """
-    df = pd.read_csv('nasdaq_intrinsic_values.csv')
 
     # Check if required columns exist
     required_columns = [
@@ -20,9 +19,7 @@ def filter_undervalued_companies(output_filename="undervalued_companies.csv"):
 
     # Filter companies where current price <= 115% of MOS price
     undervalued = df[df["Current_price"] <= 1.15 * df["MOS_Price"]]
-
-    undervalued.to_csv(output_filename, index=False)
-    print(f"{len(undervalued)} undervalued companies saved to {output_filename}")
+    return undervalued
 
 def get_stock_price(ticker, date_str=None):
     """
@@ -98,6 +95,27 @@ def calculate_intrinsic_value(eps_old, eps_new, years=10, pe_ratio=30, discount_
         print(f"Exception:{e}")
         return None
 
+def sort_by_mos_difference(df):
+    """
+    Sort the DataFrame by the percentage difference between Current Price and MOS Price.
+
+    Percentage Difference = ((MOS_Price - Current_price) / Current_price) * 100
+
+    Parameters:
+        df (pd.DataFrame): The input DataFrame with at least 'Current_price' and 'MOS_Price' columns.
+
+    Returns:
+        pd.DataFrame: A new DataFrame sorted by the percentage difference, descending.
+    """
+    if not {'Current_price', 'MOS_Price'}.issubset(df.columns):
+        raise ValueError("DataFrame must contain 'Current_price' and 'MOS_Price' columns.")
+
+    df = df.copy()
+    df["MOS_Diff_%"] = ((df["MOS_Price"] - df["Current_price"]) / df["Current_price"]) * 100
+    df_sorted = df.sort_values(by="MOS_Diff_%", ascending=False)
+
+    return df_sorted
+
 df = pd.read_csv("nasdaq_eps_data.csv")
 
 results = []
@@ -110,12 +128,24 @@ for _, row in df.iterrows():
             "Ticker": row["Ticker"],
             "EPS_initial": row["EPS_initial"],
             "EPS_latest": row["EPS_latest"],
-            "Current_price": round(get_stock_price(row["Ticker"]), 2)
+            "Current_price": get_stock_price(row["Ticker"])
         })
         results.append(result)
 
 output_df = pd.DataFrame(results)
-output_df.to_csv("nasdaq_intrinsic_values.csv", index=False)
+intrinsic_values_file = "nasdaq_intrinsic_values_backtest5"
+output_df.to_csv(f"{intrinsic_values_file}.csv", index=False)
 
-print(f"Saved intrinsic value results for {len(output_df)} companies to 'nasdaq_intrinsic_values.csv'")
-filter_undervalued_companies()
+print(f"Saved intrinsic value results for {len(output_df)} companies to {intrinsic_values_file}")
+output_filename="undervalued_companies_backtest5.csv"
+dframe = pd.read_csv(f'{intrinsic_values_file}.csv')
+undervalued = filter_undervalued_companies(dframe)
+undervalued.to_csv(output_filename, index=False)
+print(f"{len(undervalued)} undervalued companies saved to {output_filename}")
+undervalued_sorted = sort_by_mos_difference(undervalued)
+undervalued_sorted = undervalued_sorted[[
+    "Company", "Ticker", "Current_price", "MOS_Price", "MOS_Diff_%",
+    "EPS_initial", "EPS_latest", "EPS_CAGR"
+]]
+undervalued_sorted.to_csv(f"{output_filename}_sorted", index=False)
+undervalued_sorted.to_html(f"{output_filename}_sorted.html", index=False)
