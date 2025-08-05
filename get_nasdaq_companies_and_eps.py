@@ -86,8 +86,8 @@ for _, row in nasdaq.iterrows():
     results.append({
         'Company': company,
         'Ticker': ticker,
-        f"EPS_initial}": eps_data[target_years[0]],
-        f"EPS_latest}": eps_data[target_years[1]],
+        'EPS_initial': eps_data[target_years[0]],
+        'EPS_latest': eps_data[target_years[1]],
     })
 
 df_results = pd.DataFrame(results)
