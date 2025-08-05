@@ -6,19 +6,10 @@ def filter_undervalued_companies(df):
     """
     Filters companies where the current stock price is less than or equal to 115% of the Margin of Safety (MOS) price.
     """
-
-    # Check if required columns exist
-    required_columns = [
-        "Company", "Ticker", "EPS_initial", "EPS_latest",
-        "Current_price", "EPS_CAGR", "Future_EPS", 
-        "Future_Price", "Sticker_Price", "MOS_Price"
-    ]
-    for col in required_columns:
-        if col not in df.columns:
-            raise ValueError(f"Missing required column: {col}")
+    current_price_col = next((col for col in df.columns if col.startswith("Current_price")), None)
 
     # Filter companies where current price <= 115% of MOS price
-    undervalued = df[df["Current_price"] <= 1.15 * df["MOS_Price"]]
+    undervalued = df[df[current_price_col] <= 1.15 * df["MOS_Price"]]
     return undervalued
 
 def get_stock_price(ticker, date_str=None):
@@ -59,10 +50,10 @@ def get_stock_price(ticker, date_str=None):
             close_price = data['Close'].iloc[-1]  # fallback to the most recent available
 
         print(f"{ticker} closing price on {date}: ${float(close_price.iloc[0]):.2f}")
-        return float(close_price.iloc[0])
+        return float(close_price.iloc[0]), date
     else:
         print(f"No data found for {ticker} near {date}")
-        return None
+        return None, date
 
 def safe_float(value):
     try:
@@ -107,11 +98,10 @@ def sort_by_mos_difference(df):
     Returns:
         pd.DataFrame: A new DataFrame sorted by the percentage difference, descending.
     """
-    if not {'Current_price', 'MOS_Price'}.issubset(df.columns):
-        raise ValueError("DataFrame must contain 'Current_price' and 'MOS_Price' columns.")
+    current_price_col = next((col for col in df.columns if col.startswith("Current_price")), None)
 
     df = df.copy()
-    df["MOS_Diff_%"] = ((df["MOS_Price"] - df["Current_price"]) / df["Current_price"]) * 100
+    df["MOS_Diff_%"] = ((df["MOS_Price"] - df[current_price_col]) / df[current_price_col]) * 100
     df_sorted = df.sort_values(by="MOS_Diff_%", ascending=False)
 
     return df_sorted
@@ -123,29 +113,32 @@ results = []
 for _, row in df.iterrows():
     result = calculate_intrinsic_value(row["EPS_initial"], row["EPS_latest"])
     if result:
+        price, date = get_stock_price(row["Ticker"])
         result.update({
             "Company": row["Company"],
             "Ticker": row["Ticker"],
             "EPS_initial": row["EPS_initial"],
             "EPS_latest": row["EPS_latest"],
-            "Current_price": get_stock_price(row["Ticker"])
+            f"Current_price {date}": price
         })
         results.append(result)
 
 output_df = pd.DataFrame(results)
 intrinsic_values_file = "nasdaq_intrinsic_values_backtest5"
-output_df.to_csv(f"{intrinsic_values_file}.csv", index=False)
+output_df["Date_of_calculation"] = datetime.today().strftime('%d-%m-%Y')
+output_df.to_csv(f"{intrinsic_values_file}.csv", index=True)
 
 print(f"Saved intrinsic value results for {len(output_df)} companies to {intrinsic_values_file}")
 output_filename="undervalued_companies_backtest5.csv"
 dframe = pd.read_csv(f'{intrinsic_values_file}.csv')
 undervalued = filter_undervalued_companies(dframe)
-undervalued.to_csv(output_filename, index=False)
+undervalued.to_csv(output_filename, index=True)
 print(f"{len(undervalued)} undervalued companies saved to {output_filename}")
 undervalued_sorted = sort_by_mos_difference(undervalued)
+undervalued_sorted = undervalued_sorted.reset_index(drop=True)
+current_price_col = next((col for col in undervalued_sorted.columns if col.startswith("Current_price")), None)
 undervalued_sorted = undervalued_sorted[[
-    "Company", "Ticker", "Current_price", "MOS_Price", "MOS_Diff_%",
-    "EPS_initial", "EPS_latest", "EPS_CAGR"
+    "Date_of_calculation", "Company", "Ticker", current_price_col, "MOS_Price", "MOS_Diff_%", "EPS_initial", "EPS_latest", "EPS_CAGR"
 ]]
-undervalued_sorted.to_csv(f"{output_filename}_sorted", index=False)
-undervalued_sorted.to_html(f"{output_filename}_sorted.html", index=False)
+undervalued_sorted.to_csv(f"{output_filename}_sorted", index=True)
+undervalued_sorted.to_html(f"{output_filename}_sorted.html", index=True)
