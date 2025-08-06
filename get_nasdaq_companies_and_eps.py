@@ -59,37 +59,44 @@ def get_nasdaq_companies():
         # Only keep Company and ticker columns
         #nasdaq_table = nasdaq_table[['Company', 'Ticker']]
         print(tabulate(nasdaq_table, headers='keys', tablefmt='fancy_grid', showindex=True))
-        print(f"\nTotal number of companies: {len(nasdaq_table)}")
+        print(f"\nTotal number of companies: {len(nasdaq_table)-1}")
     else:
         print("Could not find the Nasdaq-100 table.")
     return nasdaq_table
 
-# Final_year will be current year for the latest calculation
-# It will be a year in the past for backtesting purposes.
-final_year = datetime.now().year
-target_years = [final_year - 11, final_year - 1]
-nasdaq = get_nasdaq_companies()
-results = []
+def get_eps_for_companies(final_year, years_back):
+    # Final_year will be current year for the latest calculation
+    # It will be a year in the past for backtesting purposes.
 
-for _, row in nasdaq.iterrows():
-    ticker = row['Ticker']
-    company = row['Company']
-    eps_data = {}
+    init_year = final_year -1 - years_back # The -1 here is because EPS will
+    final_year = final_year-1              # not be available mid-year, so get
+    nasdaq = get_nasdaq_companies()        # EPS for the year before.
+    results = []
 
-    for y in target_years:
-        eps = fetch_eps(ticker, y)
-        eps_data[y] = eps
-        time.sleep(15)  # Avoid blocking
-        # TODO: Figure out sweet spot between being fast and not being blocked
+    for _, row in nasdaq.iterrows():
+        ticker = row['Ticker']
+        company = row['Company']
+        eps_data = {}
 
-    print(f"{ticker}: EPS {target_years[0]} = {eps_data[target_years[0]]}, EPS {target_years[1]} = {eps_data[target_years[1]]}")
-    results.append({
-        'Company': company,
-        'Ticker': ticker,
-        'EPS_initial': eps_data[target_years[0]],
-        'EPS_latest': eps_data[target_years[1]],
-    })
+        for y in init_year, final_year:
+            eps = fetch_eps(ticker, y)
+            eps_data[y] = eps
+            time.sleep(15)  # Avoid blocking
+            # TODO: Figure out sweet spot between being fast and not being blocked
+            # 9 seconds fails after about 7 attempts.
 
-df_results = pd.DataFrame(results)
-df_results.to_csv("nasdaq_eps_data.csv", index=False)
-print("\nSaved results to nasdaq_eps_data.csv")
+        print(f"{ticker}: EPS {init_year} = {eps_data[init_year]}, EPS {final_year} = {eps_data[final_year]}")
+        results.append({
+            'Company': company,
+            'Ticker': ticker,
+            'EPS_initial': eps_data[init_year],
+            'EPS_latest': eps_data[final_year],
+        })
+
+    df_results = pd.DataFrame(results)
+    df_results.to_csv("nasdaq_eps_data.csv", index=False)
+    print("\nSaved results to nasdaq_eps_data.csv")
+    return df_results
+
+if __name__ == "__main__":
+    get_eps_for_companies(final_year= datetime.now().year, years_back=10)
