@@ -128,23 +128,23 @@ def calculate_value(df, backtesting, final_year, years_back):
 
     eps_data = pd.DataFrame(results)
     back = "backtest" if backtesting else ""
-    intrinsic_values_file = f"nasdaq_intrinsic_values_{back}_from{final_year}to{final_year-years_back}"
+    intrinsic_values_file = f"nasdaq_intrinsic_values_{back}_from_{final_year}to{final_year-years_back}"
     eps_data["Calculation_date"] = datetime.today().strftime('%d-%m-%Y')
     eps_data.to_csv(f"{intrinsic_values_file}.csv", index=True)
 
     print(f"Saved intrinsic value results for {len(eps_data)-1} companies to {intrinsic_values_file}")
-    undervalued_file=f"undervalued_companies_{back}_from_{final_year}to{final_year-years_back}.csv"
+    undervalued_file=f"undervalued_companies_{back}_from_{final_year}to{final_year-years_back}"
     dframe = pd.read_csv(f'{intrinsic_values_file}.csv')
     undervalued = filter_undervalued_companies(dframe)
-    undervalued.to_csv(undervalued_file, index=True)
-    print(f"{len(undervalued)} undervalued companies saved to {undervalued_file}")
+    undervalued.to_csv(f"{undervalued_file}.csv", index=True)
+    print(f"{len(undervalued)} undervalued companies saved to {undervalued_file}.csv")
     undervalued_sorted = sort_by_mos_difference(undervalued)
     undervalued_sorted = undervalued_sorted.reset_index(drop=True)
     current_price_col = next((col for col in undervalued_sorted.columns if col.startswith("Price")), None)
     undervalued_sorted = undervalued_sorted[[
         "Calculation_date", "Company", "Ticker", current_price_col, "MOS_Price", "MOS_Diff_%", "EPS_initial", "EPS_latest", "EPS_CAGR"
     ]]
-    undervalued_sorted.to_csv(f"{undervalued_file}_sorted", index=True)
+    undervalued_sorted.to_csv(f"{undervalued_file}_sorted.csv", index=True)
     undervalued_sorted.to_html(f"{undervalued_file}_sorted.html", index=True)
 
 if __name__ == "__main__":
