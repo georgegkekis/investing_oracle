@@ -110,7 +110,7 @@ def calculate_value(df, backtesting, final_year, years_back):
     results = []
 
     for _, row in df.iterrows():
-        result = calculate_intrinsic_value(row["EPS_initial"], row["EPS_latest"])
+        result = calculate_intrinsic_value(row["EPS_initial"], row["EPS_latest"], years_back)
         if result:
             if final_year == datetime.now().year:
                 price_date = datetime.today().strftime('%Y-%m-%d')
