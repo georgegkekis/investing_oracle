@@ -66,7 +66,7 @@ def calculate_intrinsic_value(eps_old, eps_new, years=10, pe_ratio=30, discount_
         eps_old = safe_float(eps_old)
         eps_new = safe_float(eps_new)
 
-        if eps_old <= 0 or eps_new <= 0:
+        if eps_old is None or eps_new is None or eps_old <= 0 or eps_new <= 0:
             return None  # Invalid for CAGR
 
         cagr = (eps_new / eps_old) ** (1 / years) - 1
