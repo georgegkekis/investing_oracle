@@ -6,6 +6,35 @@ from datetime import datetime
 import time
 import random
 
+def get_eps_with_local_lookup(ticker, company, year):
+    eps_file="nasdaq_eps.csv"
+    col = f"EPS_{year}"
+
+    eps_df = pd.read_csv(eps_file)
+
+    # Look for existing entry
+    if ticker in eps_df["Ticker"].values:
+        row_idx = eps_df[eps_df["Ticker"] == ticker].index[0]
+
+        # Ensure column exists in DataFrame
+        if col not in eps_df.columns:
+            eps_df[col] = None
+
+        # If value exists, return it
+        if pd.notna(eps_df.at[row_idx, col]):
+            return eps_df.at[row_idx, col]
+    else:
+        # Add row if ticker is new
+        new_row = {"Ticker": ticker, "Company": company, col: None}
+        eps_df = pd.concat([eps_df, pd.DataFrame([new_row])], ignore_index=True)
+        row_idx = eps_df[eps_df["Ticker"] == ticker].index[0]
+
+    eps = fetch_eps(ticker, year)
+    eps_df.at[row_idx, col] = eps
+
+    eps_df.to_csv(eps_file, index=False)
+    return eps
+
 def fetch_eps(symbol, year):
     url = f"https://www.macrotrends.net/stocks/charts/{symbol}/{symbol.lower()}/eps-earnings-per-share-diluted"
 
@@ -19,7 +48,7 @@ def fetch_eps(symbol, year):
     headers = {
         "User-Agent": random.choice(USER_AGENTS)
     }
-
+    time.sleep(15) # Macrotrends.net blocks frequent requests
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -79,11 +108,8 @@ def get_eps_for_companies(final_year, years_back):
         eps_data = {}
 
         for y in init_year, final_year:
-            eps = fetch_eps(ticker, y)
+            eps = get_eps_with_local_lookup(ticker, company, y)
             eps_data[y] = eps
-            time.sleep(15)  # Avoid blocking
-            # TODO: Figure out sweet spot between being fast and not being blocked
-            # 9 seconds fails after about 7 attempts.
 
         print(f"{ticker}: EPS {init_year} = {eps_data[init_year]}, EPS {final_year} = {eps_data[final_year]}")
         results.append({
