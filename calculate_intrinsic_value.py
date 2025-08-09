@@ -168,7 +168,7 @@ def calculate_value(df, backtesting, final_year, years_back):
     </figure>
     """
 
-    with open(f"{directory}/{undervalued_file}_sorted.html", "w", encoding="utf-8") as f:
+    with open(f"{directory}/{undervalued_file}.html", "w", encoding="utf-8") as f:
         f.write(full_html)
 if __name__ == "__main__":
     calculate_value(pd.read_csv("nasdaq_eps_data.csv"), backtesting=False, final_year= datetime.now().year, years_back=10)
