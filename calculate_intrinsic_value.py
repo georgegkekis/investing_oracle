@@ -129,14 +129,10 @@ def calculate_value(df, backtesting, final_year, years_back):
 
     eps_data = pd.DataFrame(results)
     back = "backtest" if backtesting else ""
-    intrinsic_values_file = f"nasdaq_intrinsic_values_{back}_from_{final_year}to{final_year-years_back}"
-    eps_data.to_csv(f"{directory}/{intrinsic_values_file}.csv", index=True)
 
-    print(f"Saved intrinsic value results for {len(eps_data)-1} companies to {directory}/{intrinsic_values_file}")
+    print(f"Calculated intrinsic value results for {len(eps_data)-1} companies")
     undervalued_file=f"undervalued_companies_{back}_from_{final_year}to{final_year-years_back}"
-    dframe = pd.read_csv(f'{directory}/{intrinsic_values_file}.csv')
-    undervalued = filter_undervalued_companies(dframe)
-    undervalued.to_csv(f"{directory}/{undervalued_file}.csv", index=True)
+    undervalued = filter_undervalued_companies(eps_data)
     print(f"{len(undervalued)} undervalued companies saved to {directory}/{undervalued_file}.csv")
     undervalued_sorted = sort_by_mos_difference(undervalued)
     undervalued_sorted = undervalued_sorted.reset_index(drop=True)
@@ -144,7 +140,6 @@ def calculate_value(df, backtesting, final_year, years_back):
     undervalued_sorted = undervalued_sorted[[
         "Company", "Ticker", current_price_col, "MOS_Price", "MOS_Diff_%", "EPS_initial", "EPS_latest", "EPS_CAGR"
     ]]
-    undervalued_sorted.to_csv(f"{directory}/{undervalued_file}_sorted.csv", index=True)
     html_table = undervalued_sorted.to_html(index=True)
     caption_text = f"Evaluated on {datetime.today().strftime('%d-%m-%Y')} final year:{final_year}, years back:{years_back}"
 
