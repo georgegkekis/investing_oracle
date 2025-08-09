@@ -123,10 +123,20 @@ def calculate_value(df, backtesting, final_year, years_back):
                 "Ticker": row["Ticker"],
                 "EPS_initial": row["EPS_initial"],
                 "EPS_latest": row["EPS_latest"],
-                f"Price {date}": price
+                f"Price {date}": price,
             })
-            results.append(result)
+            if backtesting:
+                today_price, date_today = get_stock_price(row["Ticker"], datetime.today().strftime('%Y-%m-%d'))
+                result[f"Price {date_today}"] = today_price
+                if price and today_price:
+                    result["Return_%"] = round(((today_price - price) / price) * 100, 2)
+                else:
+                    result["Return_%"] = None
+            else:
+                result["Return_%"] = None
 
+
+            results.append(result)
     eps_data = pd.DataFrame(results)
     back = "backtest" if backtesting else ""
 
@@ -137,7 +147,13 @@ def calculate_value(df, backtesting, final_year, years_back):
     undervalued_sorted = sort_by_mos_difference(undervalued)
     undervalued_sorted = undervalued_sorted.reset_index(drop=True)
     current_price_col = next((col for col in undervalued_sorted.columns if col.startswith("Price")), None)
-    undervalued_sorted = undervalued_sorted[[
+
+    if backtesting:
+        undervalued_sorted = undervalued_sorted[[
+        "Company", "Ticker", current_price_col, f"Price {date_today}", "MOS_Price", "MOS_Diff_%", "EPS_initial", "EPS_latest", "EPS_CAGR", "Return_%"
+    ]]
+    else:
+        undervalued_sorted = undervalued_sorted[[
         "Company", "Ticker", current_price_col, "MOS_Price", "MOS_Diff_%", "EPS_initial", "EPS_latest", "EPS_CAGR"
     ]]
     html_table = undervalued_sorted.to_html(index=True)
